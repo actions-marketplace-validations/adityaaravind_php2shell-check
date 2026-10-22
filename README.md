@@ -55,31 +55,68 @@ Published with [npm provenance](https://docs.npmjs.com/generating-provenance-sta
 
 ## Usage
 
+Every recording below is the real CLI, captured by `demo/make_gif.py`.
+
+### 1. Run it
+
+Nothing to install and nothing to configure. Pass versions in directly for an offline check:
+
 ```bash
-php2shell-check                                   # discover and probe local PHP binaries
-php2shell-check --docker php:8.3-fpm --docker my-app:latest
-php2shell-check --containers                      # every running container
-php2shell-check --container web --container worker
-php2shell-check --url https://example.com
-php2shell-check --inventory hosts.csv
-php2shell-check 8.3.30 8.4.27                     # offline version check
-php2shell-check info                              # advisory, fixed versions, mitigations
+npx php2shell-check 8.3.30 8.5.12
 ```
 
-Combine any of these in one run. Then pick an output:
+![Checking two PHP versions](demo/step-1-run.gif)
+
+### 2. Scan an image before you ship it
 
 ```bash
-php2shell-check --containers --html report.html --open   # dashboard
-php2shell-check --inventory hosts.csv --json             # machine-readable
-php2shell-check --docker my-app:latest --markdown php2shell.md
+npx php2shell-check --docker php:8.4.26-cli --docker php:8.2-apache
 ```
 
-Test whether mitigations take effect before you roll them out:
+![Scanning Docker images](demo/step-2-docker.gif)
+
+### 3. Scan what is already running
+
+Each container is probed twice, through the CLI and through PHP-FPM, because the two often load different ini files.
 
 ```bash
-php2shell-check --docker my-app:latest \
+npx php2shell-check --container web --container worker
+npx php2shell-check --containers        # every running container
+```
+
+![Scanning running containers](demo/step-3-containers.gif)
+
+### 4. Check a mitigation before rolling it out
+
+`--define` applies ini overrides to the probe, so you can confirm a setting really moves the verdict before you push it to a fleet.
+
+```bash
+npx php2shell-check --docker my-app:latest \
   --define memory_limit=-1 --define session.upload_progress.enabled=0
 ```
+
+![Testing an interim mitigation](demo/step-4-mitigations.gif)
+
+### 5. Hand someone a report
+
+```bash
+npx php2shell-check 8.3.30 8.5.12 --html report.html --open
+```
+
+![Writing an HTML report](demo/step-5-report.gif)
+
+### Everything else
+
+```bash
+npx php2shell-check                              # discover and probe local PHP binaries
+npx php2shell-check --url https://example.com
+npx php2shell-check --inventory hosts.csv
+npx php2shell-check --inventory hosts.csv --json             # machine-readable
+npx php2shell-check --docker my-app:latest --markdown php2shell.md
+npx php2shell-check info                         # advisory, fixed versions, mitigations
+```
+
+Combine any of these in a single run.
 
 ### Dashboard
 
@@ -184,7 +221,7 @@ Restart **all** PHP workers afterwards. Container memory limits and WAF rules ar
 ```bash
 npm test                                          # node:test, no dependencies
 docker run -d --name p2s-demo-fpm php:8.3.30-fpm  # demo target
-python3 demo/make_gif.py                          # regenerate demo/demo.gif (Pillow)
+python3 demo/make_gif.py                          # regenerate demo/*.gif (Pillow)
 python3 docs/make_social_card.py                  # regenerate docs/social-card.png
 ```
 

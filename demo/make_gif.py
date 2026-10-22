@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Render demo/demo.gif: runs the real CLI (FORCE_COLOR=1) against Docker targets
-and animates its ANSI output as a terminal session. Needs Docker and Pillow.
+"""Render the demo GIFs: runs the real CLI (FORCE_COLOR=1) against Docker
+targets and animates its ANSI output as a terminal session. Needs Docker and
+Pillow.
 
     docker run -d --name p2s-demo-fpm php:8.3.30-fpm
     python3 demo/make_gif.py
+
+Writes one tight GIF per README step (demo/step-*.gif), each auto-sized to its
+own output, plus the combined demo/demo.gif used as the hero image.
 """
 import os
 import re
@@ -26,8 +30,8 @@ FALLBACK = {
 }
 FALLBACK_CHARS = set("✔✖▲⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
 CW = FONTS[False].getlength("M")
-COLS, ROWS, LH, PAD, TOP = 112, 40, 18, 16, 38
-W, H = int(PAD * 2 + CW * COLS), TOP + ROWS * LH + PAD
+COLS, LH, PAD, TOP = 112, 18, 16, 38
+MIN_COLS = 64
 
 BG, FG = (13, 17, 23), (201, 209, 217)
 ANSI16 = {
@@ -38,22 +42,42 @@ ANSI16 = {
 }
 SGR = re.compile(r"\x1b\[([0-9;]*)m")
 
-# The shown string is what the viewer reads; the args are what actually runs.
-SCENES = [
-    ("npx php2shell-check --docker php:8.4.26-cli --container p2s-demo-fpm",
-     ["--docker", "php:8.4.26-cli", "--container", "p2s-demo-fpm"]),
-    ("npx php2shell-check --docker php:8.4.26-cli --define memory_limit=-1",
+# (slug, title, shown command, real args). The shown string is what the viewer
+# reads; the args are what actually runs.
+STEPS = [
+    ("step-1-run", "Run it",
+     "npx php2shell-check 8.3.30 8.5.12",
+     ["8.3.30", "8.5.12"]),
+    ("step-2-docker", "Scan an image before you ship it",
+     "npx php2shell-check --docker php:8.4.26-cli --docker php:8.2-apache",
+     ["--docker", "php:8.4.26-cli", "--docker", "php:8.2-apache"]),
+    ("step-3-containers", "Scan what is already running",
+     "npx php2shell-check --container p2s-demo-fpm",
+     ["--container", "p2s-demo-fpm"]),
+    ("step-4-mitigations", "Check a mitigation before rolling it out",
+     "npx php2shell-check --docker php:8.4.26-cli --define memory_limit=-1",
      ["--docker", "php:8.4.26-cli", "--define", "memory_limit=-1"]),
-    ("npx php2shell-check 8.3.30 8.5.12 --html report.html",
+    ("step-5-report", "Hand someone a report",
+     "npx php2shell-check 8.3.30 8.5.12 --html report.html",
      ["8.3.30", "8.5.12", "--html", "/tmp/p2s-demo-report.html"]),
 ]
 
+PROMPT = "\x1b[94m$\x1b[0m "
+_CACHE = {}
+
 
 def run(args):
-    env = dict(os.environ, FORCE_COLOR="1", COLUMNS=str(COLS))
-    out = subprocess.run(["node", "bin/php2shell-check.js", *args], cwd=ROOT, env=env,
-                         capture_output=True, text=True, timeout=600).stdout
-    return out.replace("/tmp/p2s-demo-report.html", "./report.html").rstrip("\n").split("\n")
+    key = tuple(args)
+    if key not in _CACHE:
+        env = dict(os.environ, FORCE_COLOR="1", COLUMNS=str(COLS))
+        out = subprocess.run(["node", "bin/php2shell-check.js", *args], cwd=ROOT, env=env,
+                             capture_output=True, text=True, timeout=600).stdout
+        _CACHE[key] = out.replace("/tmp/p2s-demo-report.html", "./report.html").rstrip("\n").split("\n")
+    return _CACHE[key]
+
+
+def plain(line):
+    return SGR.sub("", line)
 
 
 def spans(line):
@@ -85,15 +109,17 @@ def spans(line):
     return out
 
 
-def frame(lines, cursor=False):
-    img = Image.new("RGB", (W, H), BG)
+def frame(lines, cols, rows, cursor=False):
+    w = int(PAD * 2 + CW * cols)
+    h = TOP + rows * LH + PAD
+    img = Image.new("RGB", (w, h), BG)
     d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W, 26], fill=(22, 27, 34))
+    d.rectangle([0, 0, w, 26], fill=(22, 27, 34))
     for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
         d.ellipse([12 + i * 20, 8, 24 + i * 20, 20], fill=c)
     title = "php2shell-check"
-    d.text(((W - FONTS[False].getlength(title)) / 2, 5), title, font=FONTS[False], fill=(110, 118, 129))
-    view = lines[-ROWS:]
+    d.text(((w - FONTS[False].getlength(title)) / 2, 5), title, font=FONTS[False], fill=(110, 118, 129))
+    view = lines[-rows:]
     for row, line in enumerate(view):
         y = TOP + row * LH
         col = 0
@@ -115,39 +141,54 @@ def frame(lines, cursor=False):
                     d.text((x, y), ch, font=font, fill=color)
                 col += 1
     if cursor and view:
-        x = PAD + len(SGR.sub("", view[-1])) * CW
+        x = PAD + len(plain(view[-1])) * CW
         y = TOP + (len(view) - 1) * LH
         d.rectangle([x + 1, y, x + CW - 1, y + LH - 4], fill=FG)
     return img
 
 
-PROMPT = "\x1b[94m$\x1b[0m "
+def measure(scenes):
+    """Rows and columns the tallest/widest scene needs, so nothing is cropped
+    and no scene renders half a screen of empty terminal."""
+    rows = cols = 0
+    for shown, args in scenes:
+        screen = (PROMPT + shown).split("\n") + run(args) + [""]
+        rows = max(rows, len(screen))
+        cols = max(cols, max(len(plain(line)) for line in screen))
+    return rows, max(MIN_COLS, min(COLS, cols))
 
 
-def main():
+def render(scenes, path, hold=3200):
+    rows, cols = measure(scenes)
     frames, durations = [], []
 
     def add(lines, ms, cursor=False):
-        frames.append(frame(lines, cursor))
+        frames.append(frame(lines, cols, rows, cursor))
         durations.append(ms)
 
-    screen = []
-    for shown, args in SCENES:
+    for shown, args in scenes:
         out = run(args)
+        screen = []
         for i in range(0, len(shown) + 6, 6):
-            typed = (PROMPT + shown[:i]).split("\n")
-            add(screen + typed, 40, cursor=True)
-        screen = screen + (PROMPT + shown).split("\n")
-        for i, f in enumerate("⠋⠙⠹⠸⠼⠴"):
+            add(screen + (PROMPT + shown[:i]).split("\n"), 40, cursor=True)
+        screen = (PROMPT + shown).split("\n")
+        for f in "⠋⠙⠹⠸⠼⠴":
             add(screen + [f"  \x1b[36m{f}\x1b[0m Probing targets…"], 90)
         for i in range(0, len(out), 2):
             add(screen + out[: i + 2], 70)
-        screen = screen + out + [""]
-        add(screen, 3200)
-        screen = []
-    path = os.path.join(ROOT, "demo", "demo.gif")
-    frames[0].save(path, save_all=True, append_images=frames[1:], duration=durations, loop=0, optimize=True)
-    print(path, len(frames), "frames", os.path.getsize(path) // 1024, "KB")
+        add(screen + out + [""], hold)
+
+    frames[0].save(path, save_all=True, append_images=frames[1:],
+                   duration=durations, loop=0, optimize=True)
+    print(f"{os.path.relpath(path, ROOT):28} {cols:>3}x{rows:<3} "
+          f"{len(frames):>3} frames  {os.path.getsize(path) // 1024:>4} KB")
+
+
+def main():
+    for slug, _title, shown, args in STEPS:
+        render([(shown, args)], os.path.join(ROOT, "demo", f"{slug}.gif"))
+    hero = [(shown, args) for _s, _t, shown, args in STEPS[1:4]]
+    render(hero, os.path.join(ROOT, "demo", "demo.gif"))
 
 
 if __name__ == "__main__":
