@@ -35,12 +35,12 @@
 ## Install
 
 ```bash
-npm install -g php2shell-check          # once published to npm
-# or straight from GitHub, today:
-npm install -g github:adityaaravind/php2shell-check
+git clone https://github.com/adityaaravind/php2shell-check
+cd php2shell-check
+npm install -g .                        # puts `php2shell-check` on your PATH
 ```
 
-Or clone and run: `git clone https://github.com/adityaaravind/php2shell-check && cd php2shell-check && node bin/php2shell-check.js`
+No install needed to try it: `node bin/php2shell-check.js` from the clone. Straight from GitHub also works: `npm install -g github:adityaaravind/php2shell-check` (npm 12+ needs `--allow-git=all`).
 
 ## Usage
 
