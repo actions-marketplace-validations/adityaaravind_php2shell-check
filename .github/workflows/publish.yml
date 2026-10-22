@@ -1,0 +1,55 @@
+name: Publish to npm
+
+# Manual only — this never fires on its own.
+#
+# One-time setup, all doable from a phone:
+#   1. npmjs.com -> Access Tokens -> Generate New Token -> Granular Access Token
+#      Packages and scopes: Read and write. Expiry: 7 days.
+#   2. This repo -> Settings -> Secrets and variables -> Actions ->
+#      New repository secret, named NPM_TOKEN.
+#   3. Actions tab -> "Publish to npm" -> Run workflow.
+#   4. Afterwards, revoke the token on npmjs.com. Then configure npm trusted
+#      publishing (OIDC) on the package so later releases need no token at all.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Pack and validate without publishing
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write          # required for npm provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Test
+        run: npm test
+
+      - name: Smoke-check the CLI
+        run: |
+          set +e
+          node bin/php2shell-check.js 8.3.30 8.4.27
+          code=$?
+          set -e
+          # 1 means "a target needs action", the expected verdict for these two.
+          [ "$code" = "1" ] || { echo "unexpected exit $code"; exit 1; }
+
+      - name: Pack
+        run: npm pack --dry-run
+
+      - name: Publish
+        if: ${{ !inputs.dry-run }}
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
