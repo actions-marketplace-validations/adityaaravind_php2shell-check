@@ -4,6 +4,7 @@
 
 **Find every PHP exposed to PHP2Shell on your machines, images, containers and fleet, in one command.**
 
+[![npm](https://img.shields.io/npm/v/php2shell-check?color=cb3837&logo=npm)](https://www.npmjs.com/package/php2shell-check)
 [![CVE-2026-109618](https://img.shields.io/badge/CVE--2026--109618-critical-red)](#what-is-php2shell)
 [![CVE-2026-109619](https://img.shields.io/badge/CVE--2026--109619-critical-red)](#what-is-php2shell)
 [![test](https://github.com/adityaaravind/php2shell-check/actions/workflows/test.yml/badge.svg)](https://github.com/adityaaravind/php2shell-check/actions/workflows/test.yml)
@@ -37,25 +38,16 @@
 Run it without installing anything:
 
 ```bash
-npx --allow-git=all github:adityaaravind/php2shell-check   # npm 12+
-npx github:adityaaravind/php2shell-check                   # npm 11 and older
+npx php2shell-check
 ```
 
-Put it on your `PATH`:
+Or put it on your `PATH`:
 
 ```bash
-npm install -g --allow-git=all github:adityaaravind/php2shell-check
+npm install -g php2shell-check
 ```
 
-Or from a clone:
-
-```bash
-git clone https://github.com/adityaaravind/php2shell-check
-cd php2shell-check
-npm install -g .
-```
-
-npm 12 disabled `git:` fetches by default, which is why the flag is needed above.
+Published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements): the tarball carries a signed attestation that it was built from this repository by GitHub Actions, which you can verify with `npm audit signatures`.
 
 ## Usage
 
