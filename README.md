@@ -112,6 +112,23 @@ Fail the build when an image you are about to ship is exposed. The Markdown repo
     html: php2shell-report.html          # optional
 ```
 
+## How it compares
+
+Most PHP2Shell tooling answers *"is this one URL vulnerable?"*, usually by sending probe traffic. This answers *"which of my hosts, images and containers are exposed, and what do I change on each?"* — without sending attack traffic.
+
+| | php2shell-check | Active remote scanners | Version checkers |
+|---|---|---|---|
+| Local binaries | auto-discovered | — | one at a time |
+| Docker images, before you ship | yes | — | — |
+| Running containers | yes, CLI and FPM ini separately | — | — |
+| Inventory / CMDB files | CSV, TSV, JSON | host lists | — |
+| URLs | passive `X-Powered-By` hint | active probes | yes |
+| ini-aware verdicts | yes, incl. `--define` what-if | — | — |
+| Traffic sent per URL | one `HEAD` | multi-MiB crafted probes | one request |
+| Output | TUI, HTML dashboard, JSON, Markdown | text, JSON | text, JSON |
+
+Reach for an active remote scanner when you need to prove reachability from outside and have authorization to probe. Reach for this when you own the estate and need coverage, mitigation verification and a report you can attach to a ticket.
+
 ## What is PHP2Shell?
 
 Two memory-safety bugs in PHP core. Details leaked on Oct 20, 2026 and fixes shipped Oct 21. Both are **CVSS v4.0 9.2** and exploitable by an **unauthenticated remote attacker**. The affected code path dates back to PHP 5.4.
@@ -161,6 +178,7 @@ python3 demo/make_gif.py                          # regenerate demo/demo.gif (Pi
 
 ## Sources
 
+- **Upstream advisories, authoritative:** [GHSA-w8hw-w9fx-j79w](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w) (CVE-2026-109618) · [GHSA-6wmf-4rv5-p3rp](https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp) (CVE-2026-109619)
 - [Tenable: PHP2Shell FAQ](https://www.tenable.com/blog/php2shell-cve-2026-109618-cve-2026-109619-frequently-asked-questions-about-critical-php-remote)
 - [Qualys: PHP announces critical security release](https://blog.qualys.com/vulnerabilities-threat-research/2026/10/20/php-announces-critical-security-release-for-two-vulnerabilities)
 - [Rapid7 ETR](https://www.rapid7.com/blog/post/etr-cve-2026-109618-and-cve-2026-109619-critical-unauthenticated-remote-code-execution-in-php/)
