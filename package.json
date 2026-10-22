@@ -1,0 +1,41 @@
+{
+  "name": "php2shell-check",
+  "version": "1.0.0",
+  "description": "Read-only exposure scanner for PHP2Shell (CVE-2026-109618 / CVE-2026-109619): local PHP, Docker images, running containers, URLs and inventories, with a terminal UI and an HTML dashboard. No exploit code.",
+  "type": "module",
+  "bin": {
+    "php2shell-check": "bin/php2shell-check.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.3"
+  },
+  "keywords": [
+    "php",
+    "php2shell",
+    "cve-2026-109618",
+    "cve-2026-109619",
+    "security",
+    "vulnerability-scanner",
+    "devsecops",
+    "cli"
+  ],
+  "author": "Aditya Aravind",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adityaaravind/php2shell-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adityaaravind/php2shell-check/issues"
+  },
+  "homepage": "https://github.com/adityaaravind/php2shell-check#readme"
+}

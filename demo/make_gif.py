@@ -1,67 +1,126 @@
 #!/usr/bin/env python3
-"""Render demo.gif: runs php2shell_check.py against real PHP Docker images and
-animates the captured output as a terminal session."""
+"""Render demo/demo.gif: runs the real CLI (FORCE_COLOR=1) against Docker targets
+and animates its ANSI output as a terminal session. Needs Docker and Pillow.
+
+    docker run -d --name p2s-demo-fpm php:8.3.30-fpm
+    python3 demo/make_gif.py
+"""
 import os
+import re
 import subprocess
-import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_DIR = "/usr/share/fonts/truetype/jetbrains-mono-zorin-os"
-FONT = ImageFont.truetype(os.path.join(FONT_DIR, "JetBrainsMono-Regular.ttf"), 15)
-BOLD = ImageFont.truetype(os.path.join(FONT_DIR, "JetBrainsMono-Bold.ttf"), 15)
-BG, FG, DIM = (13, 17, 23), (201, 209, 217), (125, 133, 144)
-GREEN, RED, YELLOW, BLUE = (63, 185, 80), (248, 81, 73), (210, 153, 34), (88, 166, 255)
-W, LINE_H, PAD, TOP, ROWS = 1060, 22, 18, 40, 24
+FONT_DIR = os.environ.get("DEMO_FONT_DIR", "/usr/share/fonts/truetype/jetbrains-mono-zorin-os")
+SIZE = 14
+FONTS = {
+    False: ImageFont.truetype(os.path.join(FONT_DIR, "JetBrainsMono-Regular.ttf"), SIZE),
+    True: ImageFont.truetype(os.path.join(FONT_DIR, "JetBrainsMono-Bold.ttf"), SIZE),
+}
+# JetBrains Mono lacks a few symbols the CLI prints; draw those with DejaVu.
+FALLBACK_DIR = os.environ.get("DEMO_FALLBACK_DIR", "/usr/share/fonts/truetype/dejavu")
+FALLBACK = {
+    False: ImageFont.truetype(os.path.join(FALLBACK_DIR, "DejaVuSansMono.ttf"), SIZE),
+    True: ImageFont.truetype(os.path.join(FALLBACK_DIR, "DejaVuSansMono-Bold.ttf"), SIZE),
+}
+FALLBACK_CHARS = set("✔✖▲⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+CW = FONTS[False].getlength("M")
+COLS, ROWS, LH, PAD, TOP = 112, 50, 18, 16, 38
+W, H = int(PAD * 2 + CW * COLS), TOP + ROWS * LH + PAD
+
+BG, FG = (13, 17, 23), (201, 209, 217)
+ANSI16 = {
+    30: (13, 17, 23), 31: (248, 81, 73), 32: (63, 185, 80), 33: (210, 153, 34),
+    34: (88, 166, 255), 35: (188, 140, 255), 36: (57, 197, 207), 37: (201, 209, 217),
+    90: (110, 118, 129), 91: (255, 123, 114), 92: (86, 211, 100), 93: (227, 179, 65),
+    94: (121, 192, 255), 95: (210, 168, 255), 96: (86, 212, 221), 97: (240, 246, 252),
+}
+SGR = re.compile(r"\x1b\[([0-9;]*)m")
 
 SCENES = [
-    ("php:8.4.26-cli", ""),
-    ("php:8.4.26-cli", "-d memory_limit=-1 -d session.upload_progress.enabled=0"),
-    ("php:8.1-cli", ""),
-    ("php:8.4-cli", ""),
+    ("php2shell-check --docker php:8.4.26-cli --docker php:8.4-cli --docker php:7.4-cli --container p2s-demo-fpm",
+     ["--docker", "php:8.4.26-cli", "--docker", "php:8.4-cli", "--docker", "php:7.4-cli", "--container", "p2s-demo-fpm"]),
+    ("php2shell-check --docker php:8.4.26-cli \\\n    --define memory_limit=-1 --define session.upload_progress.enabled=0",
+     ["--docker", "php:8.4.26-cli", "--define", "memory_limit=-1", "--define", "session.upload_progress.enabled=0"]),
+    ("php2shell-check 8.3.30 8.5.12 --html report.html",
+     ["8.3.30", "8.5.12", "--html", "/tmp/p2s-demo-report.html"]),
 ]
 
 
-def run(image, php_args):
-    env = dict(os.environ, IMAGE=image, PHP_ARGS=php_args)
-    res = subprocess.run([sys.executable, "php2shell_check.py", "--php", "demo/dphp.sh"],
-                         cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
-    return [l for l in res.stdout.splitlines() if not l.startswith("Note:")], res.returncode
+def run(args):
+    env = dict(os.environ, FORCE_COLOR="1", COLUMNS=str(COLS))
+    out = subprocess.run(["node", "bin/php2shell-check.js", *args], cwd=ROOT, env=env,
+                         capture_output=True, text=True, timeout=600).stdout
+    return out.replace("/tmp/p2s-demo-report.html", "./report.html").rstrip("\n").split("\n")
 
 
-def color(line):
-    if "PATCHED" in line or "[x]" in line or "exit 0" in line:
-        return GREEN
-    if "VULNERABLE" in line or "[ ]" in line:
-        return RED
-    if "BACKPORT" in line or "exit 1" in line:
-        return YELLOW
-    if line.startswith("#"):
-        return DIM
-    return FG
+def spans(line):
+    """Split one ANSI line into (text, fg, bg, bold, dim) runs."""
+    fg, bg, bold, dim = None, None, False, False
+    out, pos = [], 0
+    for m in SGR.finditer(line):
+        if m.start() > pos:
+            out.append((line[pos:m.start()], fg, bg, bold, dim))
+        for code in [int(c) for c in (m.group(1) or "0").split(";") if c]:
+            if code == 0:
+                fg, bg, bold, dim = None, None, False, False
+            elif code == 1:
+                bold = True
+            elif code == 2:
+                dim = True
+            elif code == 22:
+                bold = dim = False
+            elif code == 39:
+                fg = None
+            elif code == 49:
+                bg = None
+            elif code in ANSI16:
+                fg = ANSI16[code]
+            elif 40 <= code <= 47 or 100 <= code <= 107:
+                bg = ANSI16[code - 10]
+        pos = m.end()
+    out.append((line[pos:], fg, bg, bold, dim))
+    return out
 
 
 def frame(lines, cursor=False):
-    img = Image.new("RGB", (W, TOP + ROWS * LINE_H + PAD), BG)
+    img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W, 28], fill=(22, 27, 34))
+    d.rectangle([0, 0, W, 26], fill=(22, 27, 34))
     for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
-        d.ellipse([12 + i * 20, 9, 24 + i * 20, 21], fill=c)
-    d.text((W // 2 - 70, 6), "php2shell-check", font=FONT, fill=DIM)
-    visible = lines[-ROWS:]
-    for i, line in enumerate(visible):
-        y = TOP + i * LINE_H
-        if line.startswith("$ "):
-            d.text((PAD, y), "$", font=BOLD, fill=BLUE)
-            d.text((PAD + 18, y), line[2:], font=FONT, fill=FG)
-        else:
-            d.text((PAD, y), line, font=BOLD if line.startswith("PHP ") else FONT, fill=color(line))
-    if cursor and visible:
-        x = PAD + int(FONT.getlength(visible[-1]))
-        y = TOP + (len(visible) - 1) * LINE_H
-        d.rectangle([x + 2, y + 2, x + 10, y + 18], fill=FG)
+        d.ellipse([12 + i * 20, 8, 24 + i * 20, 20], fill=c)
+    title = "php2shell-check"
+    d.text(((W - FONTS[False].getlength(title)) / 2, 5), title, font=FONTS[False], fill=(110, 118, 129))
+    view = lines[-ROWS:]
+    for row, line in enumerate(view):
+        y = TOP + row * LH
+        col = 0
+        for text, fg, bg, bold, dim in spans(line):
+            if not text:
+                continue
+            x = PAD + col * CW
+            if bg:
+                d.rectangle([x, y - 2, x + len(text) * CW, y + LH - 3], fill=bg)
+            color = fg or FG
+            if dim:
+                color = tuple(int(v * 0.6 + b * 0.4) for v, b in zip(color, BG))
+            for ch in text:
+                x = PAD + col * CW
+                if ch == "█":
+                    d.rectangle([x, y - 1, x + CW, y + LH - 4], fill=color)
+                elif ch != " ":
+                    font = FALLBACK[bold] if ch in FALLBACK_CHARS else FONTS[bold]
+                    d.text((x, y), ch, font=font, fill=color)
+                col += 1
+    if cursor and view:
+        x = PAD + len(SGR.sub("", view[-1])) * CW
+        y = TOP + (len(view) - 1) * LH
+        d.rectangle([x + 1, y, x + CW - 1, y + LH - 4], fill=FG)
     return img
+
+
+PROMPT = "\x1b[94m$\x1b[0m "
 
 
 def main():
@@ -71,28 +130,22 @@ def main():
         frames.append(frame(lines, cursor))
         durations.append(ms)
 
-    screen = ["# PHP2Shell (CVE-2026-109618 / CVE-2026-109619) exposure check"]
-    add(screen, 1200)
-    for image, php_args in SCENES:
-        out, code = run(image, php_args)
-        note = f"# {image}" + (" with interim mitigations" if php_args else "")
-        prefix = f"IMAGE={image} " + (f'PHP_ARGS="{php_args[:28]}..." ' if php_args else "")
-        cmd = f"{prefix}./php2shell_check.py --php demo/dphp.sh"
-        screen = screen + ["", note]
-        typed = "$ "
-        for i in range(0, len(cmd), 4):
-            typed = "$ " + cmd[: i + 4]
-            add(screen + [typed], 45, cursor=True)
-        screen = screen + [typed]
-        add(screen, 500)
-        for line in out:
-            screen = screen + [line]
-            add(screen, 250)
-        screen = screen + [f"exit {code}"]
-        add(screen, 2200)
+    screen = []
+    for shown, args in SCENES:
+        out = run(args)
+        for i in range(0, len(shown) + 6, 6):
+            typed = (PROMPT + shown[:i]).split("\n")
+            add(screen + typed, 40, cursor=True)
+        screen = screen + (PROMPT + shown).split("\n")
+        for i, f in enumerate("⠋⠙⠹⠸⠼⠴"):
+            add(screen + [f"  \x1b[36m{f}\x1b[0m Probing targets…"], 90)
+        for i in range(0, len(out), 2):
+            add(screen + out[: i + 2], 70)
+        screen = screen + out + [""]
+        add(screen, 3200)
+        screen = []
     path = os.path.join(ROOT, "demo", "demo.gif")
-    frames[0].save(path, save_all=True, append_images=frames[1:], duration=durations,
-                   loop=0, optimize=True)
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=durations, loop=0, optimize=True)
     print(path, len(frames), "frames", os.path.getsize(path) // 1024, "KB")
 
 

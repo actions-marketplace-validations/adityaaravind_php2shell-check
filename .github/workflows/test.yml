@@ -1,0 +1,30 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - run: node bin/php2shell-check.js 8.4.27 8.5.12 --no-color
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          args: --docker php:8.4-cli
+          html: php2shell-report.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: php2shell-report
+          path: php2shell-report.html

@@ -1,0 +1,39 @@
+name: php2shell-check
+description: Fail the build when PHP targets are exposed to PHP2Shell (CVE-2026-109618 / CVE-2026-109619). Read-only, no exploit code.
+author: Aditya Aravind
+branding:
+  icon: shield
+  color: red
+inputs:
+  args:
+    description: 'Arguments for php2shell-check, e.g. "--docker my-app:latest" or "--inventory hosts.csv"'
+    required: true
+  html:
+    description: Optional path to write the HTML dashboard (upload it with actions/upload-artifact)
+    required: false
+    default: ''
+outputs:
+  exit-code:
+    description: 0 all patched, 1 action needed, 2 errors only
+    value: ${{ steps.scan.outputs.exit-code }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+    - id: scan
+      shell: bash
+      env:
+        P2S_ARGS: ${{ inputs.args }}
+        P2S_HTML: ${{ inputs.html }}
+      run: |
+        set +e
+        extra=()
+        [ -n "$P2S_HTML" ] && extra+=(--html "$P2S_HTML")
+        # P2S_ARGS is word-split on purpose (no eval).
+        node "$GITHUB_ACTION_PATH/bin/php2shell-check.js" $P2S_ARGS "${extra[@]}" --markdown "$RUNNER_TEMP/php2shell.md"
+        code=$?
+        [ -f "$RUNNER_TEMP/php2shell.md" ] && cat "$RUNNER_TEMP/php2shell.md" >> "$GITHUB_STEP_SUMMARY"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit $code
