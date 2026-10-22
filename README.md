@@ -19,6 +19,16 @@
 > [!IMPORTANT]
 > **Defensive tool.** No exploit code, no attack traffic. It reads PHP version and ini settings from targets you point it at. URL checks send one ordinary `HEAD` request and read a response header.
 
+## Quick start
+
+```bash
+npx php2shell-check                                        # the PHP on this machine
+npx php2shell-check --containers                           # every running container
+npx php2shell-check --docker my-app:latest --html out.html # an image, plus a dashboard
+```
+
+Exits `0` when every target is patched and `1` when something needs action, so it drops straight into CI.
+
 ## Features
 
 - **Terminal UI**: colour status pills, findings with the exact fix per target, interim-mitigation checklist, summary bar
@@ -35,13 +45,7 @@
 
 ## Install
 
-Run it without installing anything:
-
-```bash
-npx php2shell-check
-```
-
-Or put it on your `PATH`:
+`npx` needs no install. To put it on your `PATH` instead:
 
 ```bash
 npm install -g php2shell-check
@@ -181,6 +185,7 @@ Restart **all** PHP workers afterwards. Container memory limits and WAF rules ar
 npm test                                          # node:test, no dependencies
 docker run -d --name p2s-demo-fpm php:8.3.30-fpm  # demo target
 python3 demo/make_gif.py                          # regenerate demo/demo.gif (Pillow)
+python3 docs/make_social_card.py                  # regenerate docs/social-card.png
 ```
 
 ## Sources
