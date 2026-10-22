@@ -34,13 +34,28 @@
 
 ## Install
 
+Run it without installing anything:
+
+```bash
+npx --allow-git=all github:adityaaravind/php2shell-check   # npm 12+
+npx github:adityaaravind/php2shell-check                   # npm 11 and older
+```
+
+Put it on your `PATH`:
+
+```bash
+npm install -g --allow-git=all github:adityaaravind/php2shell-check
+```
+
+Or from a clone:
+
 ```bash
 git clone https://github.com/adityaaravind/php2shell-check
 cd php2shell-check
-npm install -g .                        # puts `php2shell-check` on your PATH
+npm install -g .
 ```
 
-No install needed to try it: `node bin/php2shell-check.js` from the clone. Straight from GitHub also works: `npm install -g github:adityaaravind/php2shell-check` (npm 12+ needs `--allow-git=all`).
+npm 12 disabled `git:` fetches by default, which is why the flag is needed above.
 
 ## Usage
 
