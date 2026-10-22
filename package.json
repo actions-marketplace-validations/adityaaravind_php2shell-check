@@ -1,6 +1,6 @@
 {
   "name": "php2shell-check",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Read-only exposure scanner for PHP2Shell (CVE-2026-109618 / CVE-2026-109619): local PHP, Docker images, running containers, URLs and inventories, with a terminal UI and an HTML dashboard. No exploit code.",
   "type": "module",
   "bin": {

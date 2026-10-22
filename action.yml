@@ -1,4 +1,4 @@
-name: php2shell-check
+name: PHP2Shell Exposure Check
 description: Fail the build when PHP targets are exposed to PHP2Shell (CVE-2026-109618 / CVE-2026-109619). Read-only, no exploit code.
 author: Aditya Aravind
 branding:
