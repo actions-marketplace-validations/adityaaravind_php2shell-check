@@ -26,7 +26,7 @@ FALLBACK = {
 }
 FALLBACK_CHARS = set("✔✖▲⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
 CW = FONTS[False].getlength("M")
-COLS, ROWS, LH, PAD, TOP = 112, 50, 18, 16, 38
+COLS, ROWS, LH, PAD, TOP = 112, 40, 18, 16, 38
 W, H = int(PAD * 2 + CW * COLS), TOP + ROWS * LH + PAD
 
 BG, FG = (13, 17, 23), (201, 209, 217)
@@ -38,12 +38,13 @@ ANSI16 = {
 }
 SGR = re.compile(r"\x1b\[([0-9;]*)m")
 
+# The shown string is what the viewer reads; the args are what actually runs.
 SCENES = [
-    ("php2shell-check --docker php:8.4.26-cli --docker php:8.4-cli --docker php:7.4-cli --container p2s-demo-fpm",
-     ["--docker", "php:8.4.26-cli", "--docker", "php:8.4-cli", "--docker", "php:7.4-cli", "--container", "p2s-demo-fpm"]),
-    ("php2shell-check --docker php:8.4.26-cli \\\n    --define memory_limit=-1 --define session.upload_progress.enabled=0",
-     ["--docker", "php:8.4.26-cli", "--define", "memory_limit=-1", "--define", "session.upload_progress.enabled=0"]),
-    ("php2shell-check 8.3.30 8.5.12 --html report.html",
+    ("npx php2shell-check --docker php:8.4.26-cli --container p2s-demo-fpm",
+     ["--docker", "php:8.4.26-cli", "--container", "p2s-demo-fpm"]),
+    ("npx php2shell-check --docker php:8.4.26-cli --define memory_limit=-1",
+     ["--docker", "php:8.4.26-cli", "--define", "memory_limit=-1"]),
+    ("npx php2shell-check 8.3.30 8.5.12 --html report.html",
      ["8.3.30", "8.5.12", "--html", "/tmp/p2s-demo-report.html"]),
 ]
 
